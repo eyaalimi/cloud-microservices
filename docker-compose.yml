@@ -1,0 +1,74 @@
+
+services:
+  db:
+    image: postgres:15
+    container_name: postgres_users
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: usersdb
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+  redis:
+    image: redis:latest
+    container_name: redis_cache
+    ports:
+      - "6379:6379"
+
+  users-service:
+    build: ./users-service
+    env_file:
+      - ./users-service/.env
+    # Pas de container_name ici !
+    # Pas de mapping "3000:3000" pour permettre le scaling
+    # Docker gère l'interne via le bridge
+    # Si tu veux permettre le mapping local, mets : ["3000"]
+    depends_on:
+      - db
+      - redis
+
+  products-service:
+    build: ./products-service
+    # Optionnel : tu peux retirer container_name si tu veux scaler plus tard
+    ports:
+      - "4000:4000"
+    depends_on:
+      - db
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      - users-service
+      - products-service
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+
+  nginx-gateway:
+    image: nginx:latest
+    container_name: nginx_gateway
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - users-service
+      - products-service
+volumes:
+  dbdata:

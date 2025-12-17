@@ -1,0 +1,8 @@
+Flask
+psycopg2-binary
+redis
+prometheus_client
+python-dotenv
+marshmallow
+Flask-Limiter
+Flask-Cors
